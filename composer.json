@@ -1,0 +1,23 @@
+{
+	"name": "haodingdan/pay",
+	"description": "The pay application.",
+	"keywords": ["pay", "slim"],
+	"license": "MIT",
+	"require": {
+        "slim/slim": "2.*",
+        "symfony/class-loader": "2.3.*@dev",
+        "illuminate/database": "*",
+        "Respect/Validation":"*",
+        "phpunit/phpunit": "3.7.*"
+    },
+    "autoload": {
+		"classmap": [
+		],
+		"psr-0": {
+		}
+	},
+	"config": {
+		"preferred-install": "dist"
+	},
+	"minimum-stability": "dev"
+}
