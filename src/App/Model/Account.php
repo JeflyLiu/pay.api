@@ -15,8 +15,8 @@ class Account extends Base
 	protected $guarded = array('id');
 
 	const STATUS_NORMAL = 0;
-	const STATUS_LOCK = 1;
-	const STATUS_UN = 2;
+	const STATUS_LOCK   = 1;
+	const STATUS_UN     = 2;
 
 	/**
 	* 验证账户是否可用
@@ -61,14 +61,14 @@ class Account extends Base
 			{
 				DB::table('account')
 					->where('id', $id)
-					->where('balance', '>=', $amount)
+					->where('balance', ' >=', $amount)
 					->increment('freeze_out', $amount);
 
 				DB::table('account_record')->insert(array(
 					'account_id' => $id, 
-					'rec_type' => $rec_type, 
-					'amount' => $amount,
-					'fund_flow' => $fund_flow, 
+					'rec_type'   => $rec_type, 
+					'amount'     => $amount,
+					'fund_flow'  => $fund_flow, 
 					'created_at' => $created_at,
 				));
 			}
@@ -93,10 +93,10 @@ class Account extends Base
 			{
 				DB::table('account_record')->insert(array(
 					'account_id' => $from_id, 
-					'rec_type' => $rec_type, 
-					'amount' => $amount,
-					'fund_flow' => $fund_flow, 
-					'created_at'=> $created_at,
+					'rec_type'   => $rec_type, 
+					'amount'     => $amount,
+					'fund_flow'  => $fund_flow, 
+					'created_at' => $created_at,
 				));
 			}
 			return $ac;

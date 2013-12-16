@@ -13,10 +13,10 @@ class Bill extends Base
 	//public $timestamps = false;
 
 	protected $guarded = array('id');
-
-	const TYPE_TRADE = 0;
+	
+	const TYPE_TRADE  = 0;
 	const TYPE_INPOUR = 1;
-	const TYPE_DRAW = 2;
+	const TYPE_DRAW   = 2;
 
 	/**
 	* 验证数据

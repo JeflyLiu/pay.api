@@ -13,9 +13,9 @@ class ErrorLog extends Base
 	protected $guarded = array('id');
 
 	const TYPE_ACCOUNT = 1;
-	const TYPE_TRADE = 2;
-	const TYPE_DRAW = 3;
-	const TYPE_INPOUR = 4;
+	const TYPE_TRADE   = 2;
+	const TYPE_DRAW    = 3;
+	const TYPE_INPOUR  = 4;
 
 
 }

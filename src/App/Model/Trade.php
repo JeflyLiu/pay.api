@@ -14,26 +14,26 @@ class Trade extends Base
 
 	protected $guarded = array('id', 'trade_sn');
 
-	const STATUS_CLOSE = 0;
-	const STATUS_START = 1;
-	const STATUS_PART = 2;
-	const STATUS_PAY = 3;
-	const STATUS_SHIP = 4;
+	const STATUS_CLOSE   = 0;
+	const STATUS_START   = 1;
+	const STATUS_PART    = 2;
+	const STATUS_PAY     = 3;
+	const STATUS_SHIP    = 4;
 	const STATUS_CONFIRM = 5;
-	const STATUS_APPEAL = 6;
-	const STATUS_REFUND = 7;
-	const STATUS_FAIL = 8;
+	const STATUS_APPEAL  = 6;
+	const STATUS_REFUND  = 7;
+	const STATUS_FAIL    = 8;
 
 	static protected $status_name = array(
-	   	self::STATUS_CLOSE =>'关闭',
-		self::STATUS_START => '待付款',
-		self::STATUS_PART => '部分支付',
-		self::STATUS_PAY => '支付完成',
-		self::STATUS_SHIP => '已经发货',
+		self::STATUS_CLOSE   => '关闭',
+		self::STATUS_START   => '待付款',
+		self::STATUS_PART    => '部分支付',
+		self::STATUS_PAY     => '支付完成',
+		self::STATUS_SHIP    => '已经发货',
 		self::STATUS_CONFIRM => '确认收货',
-		self::STATUS_APPEAL => '申请退款',
-		self::STATUS_REFUND => '退款',
-		self::STATUS_FAIL => '失败',
+		self::STATUS_APPEAL  => '申请退款',
+		self::STATUS_REFUND  => '退款',
+		self::STATUS_FAIL    => '失败',
 	);
 
 	public static function getTradeByTradeSN($trade_sn)
@@ -86,11 +86,11 @@ class Trade extends Base
 		}
 
 		$model = new Trade();
-		$model->from_id = $from_id;
-		$model->to_id = $to_id;
-		$model->amount = $amount;
+		$model->from_id  = $from_id;
+		$model->to_id    = $to_id;
+		$model->amount   = $amount;
 		$model->trade_sn = self::createSN(15);
-		$model->status = self::STATUS_START;
+		$model->status   = self::STATUS_START;
 		
 		if($errors = $model->validate())
 		{
@@ -129,10 +129,10 @@ class Trade extends Base
 			{
 				DB::table('account_record')->insert(array(
 					'account_id' => $from_id, 
-					'rec_type' => AccountRecord::TYPE_TRADE_INPOUR, 
-					'amount' => $amount,
-					'fund_flow' => AccountRecord::FLOW_IN, 
-					'created_at'=> $created_at,
+					'rec_type'   => AccountRecord::TYPE_TRADE_INPOUR, 
+					'amount'     => $amount,
+					'fund_flow'  => AccountRecord::FLOW_IN, 
+					'created_at' => $created_at,
 				));
 			}
 			
@@ -167,11 +167,11 @@ class Trade extends Base
 				->update(array('status'=>Trade::STATUS_PAY,'bill_pay'=>$bill_sn));
 
 			DB::table('bill')->insert(array(
-				'bill_sn' => $bill_sn, 
-				'bill_type' => Bill::TYPE_TRADE, 
-				'amount' => $amount,
-				'from_id' => $from_id, 
-				'to_id' => $to_id,
+				'bill_sn'    => $bill_sn, 
+				'bill_type'  => Bill::TYPE_TRADE, 
+				'amount'     => $amount,
+				'from_id'    => $from_id, 
+				'to_id'      => $to_id,
 				'created_at' => $created_at,
 			));
 
@@ -183,10 +183,10 @@ class Trade extends Base
 
 			DB::table('account_record')->insert(array(
 				'account_id' => $from_id, 
-				'rec_type' => AccountRecord::TYPE_TRADE, 
-				'amount' => $amount,
-				'fund_flow' => AccountRecord::FLOW_OUT, 
-				'created_at'=> $created_at,
+				'rec_type'   => AccountRecord::TYPE_TRADE, 
+				'amount'     => $amount,
+				'fund_flow'  => AccountRecord::FLOW_OUT, 
+				'created_at' => $created_at,
 			));
 
 			DB::table('account')
@@ -195,10 +195,10 @@ class Trade extends Base
 
 			DB::table('account_record')->insert(array(
 				'account_id' => $from_id, 
-				'rec_type' => AccountRecord::TYPE_TRADE, 
-				'amount' => $amount,
-				'fund_flow' => AccountRecord::FLOW_IN, 
-				'created_at'=> $created_at,
+				'rec_type'   => AccountRecord::TYPE_TRADE, 
+				'amount'     => $amount,
+				'fund_flow'  => AccountRecord::FLOW_IN, 
+				'created_at' => $created_at,
 			));
 		});
 	}

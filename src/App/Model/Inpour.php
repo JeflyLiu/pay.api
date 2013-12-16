@@ -16,14 +16,14 @@ class Inpour extends Base
 
 	const STATUS_CLOSE = 0;
 	const STATUS_START = 1;
-	const STATUS_END = 2;
-	const STATUS_FAIL = 3;
+	const STATUS_END   = 2;
+	const STATUS_FAIL  = 3;
 	
 	static protected $status_name = array(
-	   	self::STATUS_CLOSE =>'关闭',
+		self::STATUS_CLOSE => '关闭',
 		self::STATUS_START => '待支付',
-		self::STATUS_END => '成功',
-		self::STATUS_FAIL => '失败',
+		self::STATUS_END   => '成功',
+		self::STATUS_FAIL  => '失败',
 	);
 
 	public static function getList($params)
