@@ -32,7 +32,7 @@ class Draw {
 			return $result;
 		}
 		//尝试冻结提现资金
-		$freeze_sql = "update account set freeze_out = freeze_out + ?, balance = balance - ? where balance > ? and id = ?";
+		$freeze_sql = "update account set freeze_out = freeze_out + ?, balance = balance - ? where balance >= ? and id = ?";
 		$db = DB::connection("default")->getPdo();
 		$db->beginTransaction();
 		$stmt = $db->prepare($freeze_sql);
@@ -85,7 +85,7 @@ class Draw {
 	 * 方法分区错误码为002
 	 * 可能的错误码为
 	*/
-	static function finishApply($apply_id, $pay_voucher, $pay_user, $pay_type, $pay_note = ""){
+	static function finishApply($apply_id, $pay_voucher, $pay_user, $pay_type, $pay_amount, $pay_note = ""){
 		$db = DB::connection("default")->getPdo();
 		$db->beginTransaction();
 		//尝试标记完结
@@ -95,7 +95,8 @@ class Draw {
 				'pay_note'=>$pay_note,
 				"pay_user"=>$pay_user,
 				"pay_voucher"=>$pay_voucher,
-				"pay_type"=>$pay_type
+				"pay_type"=>$pay_type,
+				"pay_amount"=>$pay_amount,
 				);
 		$affected_rows = 
 		DB::table("draw")->where('id',"=", $apply_id)
@@ -107,30 +108,42 @@ class Draw {
 			$amount = $draw_info['amount'];
 			$account_id = $draw_info['account_id'];
 			//尝试扣除提现资金
-			$freeze_sql = "update account set freeze_out = freeze_out - ?
-				where freeze_out > ? and id = ?";
+			$affected_row = DB::table('account')
+			->where('id', $account_id)
+			->where('freeze_out',">=", $amount)
+			->decrement('freeze_out', $amount);
 			
-			$stmt = $db->prepare($freeze_sql);
-			$stmt->bindValue(1, $amount , \PDO::PARAM_STR);
-			$stmt->bindValue(2, $amount , \PDO::PARAM_STR);
-			$stmt->bindValue(3, $account_id , \PDO::PARAM_INT);
-			$stmt->execute();
-			if($stmt->rowCount() == 0){
-				//todo 资金出现异常，因为冻结资金小于提现资金
-				$db->rollBack();
-			}
-			else{
-				//todo
-				//$to = Account::ACCOUNT_SYSTEM_ID;
-				//Fund::transact($account_id, $to, $amount, Fund::FUND_TRAN_TYPE_DRAW);
-				//$bill = new \App\Model\Bill();
-				//$bill->save();
-				//DB::table("bill")->insert($values);
+			
+			if($affected_row>0){
+				$created_at = new \DateTime();
+				DB::table('account_record')->insert(array(
+				'account_id' => $account_id,
+				'rec_type'   => \App\Model\AccountRecord::TYPE_DRAW,
+				'amount'     => $amount,
+				'fund_flow'  => \App\Model\AccountRecord::FLOW_OUT,
+				'created_at' => $created_at,
+				));
+				
+				$bill_sn = \App\Model\Bill::createSN();
+				DB::table('bill')->insert(array(
+					'bill_sn'    => $bill_sn, 
+					'bill_type'  => \App\Model\Bill::TYPE_DRAW, 
+					'amount'     => $amount,
+					'from_id'    => $account_id, 
+					'to_id'      => $draw_info["bank_id"],
+					'created_at' => $created_at,
+				));
 				$db->commit();
 			}
+				
+			else {
+				//todo
+				//异常啦，账户不存在或者冻结资金不足。
+				$db->rollBack();
+			}
 		}
-		else{
-			//todo 不存在此申请或申请已不可用
+		else {
+			//提现申请不存在，或者申请已经不处于待处理的状态了。
 			$db->rollBack();
 		}
 		return array("result"=>0);
@@ -166,7 +179,7 @@ class Draw {
 			$account_id = $draw_info['account_id'];
 			//尝试解冻提现资金
 			$freeze_sql = "update account set freeze_out = freeze_out - ?, balance=balance + ?
-				where freeze_out > ? and id = ?";
+				where freeze_out >= ? and id = ?";
 			$db = DB::connection("default")->getPdo();
 			$stmt = $db->prepare($freeze_sql);
 			$stmt->bindValue(1, $amount , \PDO::PARAM_STR);
@@ -356,8 +369,18 @@ class Draw {
 			}
 		}
 		
-		$province_data = DB::table("province","haodingdan")->whereIn("id", array_keys($bank_province_ids))->get();
-		$city_data = DB::table("city","haodingdan")->whereIn("id", array_keys($bank_city_ids))->get();
+		$province_data = array();
+		if(!empty($bank_province_ids)){
+		
+			$province_data = DB::table("province","haodingdan")->whereIn("id", array_keys($bank_province_ids))->get();
+		}
+		
+		$city_data = array();
+		if(!empty($bank_city_ids)){
+			$city_data = DB::table("city","haodingdan")->whereIn("id", array_keys($bank_city_ids))->get();
+		}
+		
+		
 		$province_key_data = array();
 		foreach ($province_data as $row){
 			$province_key_data[$row["id"]] = $row["name"];
@@ -413,8 +436,16 @@ class Draw {
 			}
 		}
 		
-		$province_data = DB::table("province","haodingdan")->whereIn("id", array_keys($bank_province_ids))->get();
-		$city_data = DB::table("city","haodingdan")->whereIn("id", array_keys($bank_city_ids))->get();
+		$province_data = array();
+		if(!empty($bank_province_ids)){
+		
+			$province_data = DB::table("province","haodingdan")->whereIn("id", array_keys($bank_province_ids))->get();
+		}
+		
+		$city_data = array();
+		if(!empty($bank_city_ids)){
+			$city_data = DB::table("city","haodingdan")->whereIn("id", array_keys($bank_city_ids))->get();
+		}
 		$province_key_data = array();
 		foreach ($province_data as $row){
 			$province_key_data[$row["id"]] = $row["name"];

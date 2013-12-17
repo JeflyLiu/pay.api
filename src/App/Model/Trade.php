@@ -9,11 +9,10 @@ use Respect\Validation\Validator as v;
 class Trade extends Base
 {
 	protected $table = 'trade';
-	
-	//public $timestamps = false;
-
 	protected $guarded = array('id', 'trade_sn');
 
+	const FREEZED_AT = 15; //äº¤æ˜“é‡‘é¢å†»ç»“å¤©æ•°
+	
 	const STATUS_CLOSE   = 0;
 	const STATUS_START   = 1;
 	const STATUS_PART    = 2;
@@ -24,17 +23,6 @@ class Trade extends Base
 	const STATUS_REFUND  = 7;
 	const STATUS_FAIL    = 8;
 
-	static protected $status_name = array(
-		self::STATUS_CLOSE   => '¹Ø±Õ',
-		self::STATUS_START   => '´ı¸¶¿î',
-		self::STATUS_PART    => '²¿·ÖÖ§¸¶',
-		self::STATUS_PAY     => 'Ö§¸¶Íê³É',
-		self::STATUS_SHIP    => 'ÒÑ¾­·¢»õ',
-		self::STATUS_CONFIRM => 'È·ÈÏÊÕ»õ',
-		self::STATUS_APPEAL  => 'ÉêÇëÍË¿î',
-		self::STATUS_REFUND  => 'ÍË¿î',
-		self::STATUS_FAIL    => 'Ê§°Ü',
-	);
 
 	public static function getTradeByTradeSN($trade_sn)
 	{
@@ -42,7 +30,7 @@ class Trade extends Base
 	}
 
 
-	public static function getList($params)
+	public static function searchList($params)
 	{
 		$limit = (int)((isset($params['limit'])) ? $params['limit']: 10);
 		$offset = (int)((isset($params['offset'])) ? $params['offset']: 0);
@@ -57,8 +45,7 @@ class Trade extends Base
 		}
 
 		$count = $select->count();
-		$list = $select->skip($offset)->take($limit)->get();
-		$list = $list->toArray();
+		$list = $select->skip($offset)->take($limit)->get()->toArray();
 
 		foreach ($list as & $value) {
 			$value['trade_flow'] = (int) ($account_id != $value['from_id']);
@@ -70,7 +57,7 @@ class Trade extends Base
 		return array('count' => $count, 'list' => $list);
 	}
 
-	public static function getCreate($from_id,$to_id,$amount)
+	public static function create($from_id,$to_id,$amount)
 	{
 		if ($error = Account::disabled($from_id))
 		{
@@ -82,7 +69,7 @@ class Trade extends Base
 		}
 		if ($amount <= 0)
 		{
-			return array(404,array('msg'=>'½»Ò×½ğ¶îÓĞÎó£¡'));
+			return array(404,array('msg'=>'äº¤æ˜“é‡‘é¢æœ‰è¯¯ï¼');
 		}
 
 		$model = new Trade();
@@ -102,81 +89,115 @@ class Trade extends Base
 		return array(201,$model->toArray());
 	}
 
-	//½»Ò×Ö§³ö
-	public static function account($from_id, $amount, $use_wallet)
-	{
-		$transaction = Account::freeze_out($from_id, $amount, AccountRecord::TYPE_TRADE, AccountRecord::FLOW_OUT);
-		
-		if (! $transaction)
-		{
-			return array(500,array('msg'=>'½»Ò×Ê§°Ü£¡'));
-		}
-
-		return array(200,array('msg'=>'½»Ò×³É¹¦£¡'));
-	}
-
-	//½»Ò×Ö§³ö³äÖµ¶³½á
-	public static function freeze_in($from_id,$amount)
-	{
-		return DB::transaction(function() use($from_id,$amount)
-		{
-			$created_at = new \DateTime;
-			$ac = DB::table('account')
-				->where('id',$from_id)
-				->increment('freeze_out',$amount);
-
-			if ($ac)
-			{
-				DB::table('account_record')->insert(array(
-					'account_id' => $from_id, 
-					'rec_type'   => AccountRecord::TYPE_TRADE_INPOUR, 
-					'amount'     => $amount,
-					'fund_flow'  => AccountRecord::FLOW_IN, 
-					'created_at' => $created_at,
-				));
-			}
-			
-		});
-	}
-
-	public static function store($trade_sn, $amount, $use_wallet = false)
+	public static function store($trade_sn, $use_wallet = false)
 	{
 		$trade = Trade::getTradeByTradeSN($trade_sn);
 
 		if (! $trade)
 		{
-			return array(404,array('msg'=>'½»Ò×²»´æÔÚ£¡'));
-		}
-		if ($error = Account::disabled($trade->from_id))
-		{
-			return $error;
+			return array(404,array('msg'=>'äº¤æ˜“ä¸å­˜åœ¨ï¼'));
 		}
 
 		$account = Account::find($trade->from_id);
-		//ÕË»§Ö§¸¶½ğ¶î
-		$has_fee = $use_wallet ? (($account->balance >= $amount) ? $amount : ($amount - $account->balance)) : 0 ;
-		//Íâ²¿Ö§¸¶½ğ¶î
-		$not_fee = $amount - $wallet_fee;
+		//è´¦æˆ·æ”¯ä»˜é‡‘é¢
+		$has_fee = $use_wallet ? (($account->balance >= $trade->amount) ? $trade->amount : ($trade->amount - $account->balance)) : 0 ;
+		//å¤–éƒ¨æ”¯ä»˜é‡‘é¢
+		$not_fee = $trade->amount - $wallet_fee;
 
-		DB::transaction(function() use($trade)
+		if ($has_fee == $trade->amount)
+		{
+			$result = DB::transaction(function() use($trade)
+			{
+				$created_at = new \DateTime;
+				$bill_sn = Bill::createSN(15);
+				$ac = DB::table('account')
+					->where('id', $trade->from_id)
+					->where('balance', '>=', $trade->amount)
+					->decrement('balance', $trade->amount);
+				if ($ac)
+				{
+					DB::table('account')->where('id', $trade->from_id)->increment('balance', $trade->amount);
+					DB::table('account_record')->insert(array(
+						'account_id' => $trade->from_id,
+						'amount'     => $trade->amount,
+						'rec_type'   => AccountRecord::TYPE_TRADE_FREEZE, 
+						'fund_flow'  => AccountRecord::FLOW_OUT, 
+						'created_at' => $created_at,
+					));
+
+					DB::table('trade')->where('id', $trade->id)->update(array(
+						'status'   => Trade::STATUS_PAY,
+						'total_fee'   => $trade->amount,
+						'bill_pay' => $bill_sn
+					));
+
+					DB::table('bill')->insert(array(
+						'bill_sn'    => $bill_sn, 
+						'bill_type'  => Bill::TYPE_TRADE, 
+						'amount'     => $trade->amount,
+						'from_id'    => $trade->from_id, 
+						'to_id'      => $trade->to_id,
+						'created_at' => $created_at,
+					));
+				}
+				return $ac;
+			});
+		}else{
+			$result = DB::transaction(function() use($trade, $has_fee, $not_fee)
+			{
+				$created_at = new \DateTime;
+				$bill_sn = Bill::createSN(15);
+				$ac = DB::table('account')
+					->where('id', $trade->from_id)
+					->where('balance', '>=', $has_fee)
+					->decrement('balance', $trade->amount);
+				if ($ac)
+				{
+					DB::table('account')->where('id', $trade->from_id)->increment('balance', $has_fee);
+					DB::table('account_record')->insert(array(
+						'account_id' => $trade->from_id,
+						'amount'     => $trade->amount,
+						'rec_type'   => AccountRecord::TYPE_TRADE_FREEZE, 
+						'fund_flow'  => AccountRecord::FLOW_OUT, 
+						'created_at' => $created_at,
+					));
+
+					DB::table('trade')->where('id', $trade->id)->update(array(
+						'status'   => Trade::STATUS_PAY,
+						'total_fee'   => $trade->amount,
+						'bill_pay' => $bill_sn
+					));
+
+					DB::table('bill')->insert(array(
+						'bill_sn'    => $bill_sn, 
+						'bill_type'  => Bill::TYPE_TRADE, 
+						'amount'     => $trade->amount,
+						'from_id'    => $trade->from_id, 
+						'to_id'      => $trade->to_id,
+						'created_at' => $created_at,
+					));
+				}
+				return $ac;
+			});
+		}
+
+		DB::transaction(function() use($trade, $has_fee, $not_fee)
 		{
 			$created_at = new \DateTime;
-			$result = DB::table('trade')
-				->where('id', $trade->id)
-				->where('status', Trade::STATUS_START)
-				->update(array('status'=>Trade::STATUS_PAY,'bill_pay'=>$bill_sn));
 
-			DB::table('bill')->insert(array(
-				'bill_sn'    => $bill_sn, 
-				'bill_type'  => Bill::TYPE_TRADE, 
-				'amount'     => $amount,
-				'from_id'    => $from_id, 
-				'to_id'      => $to_id,
-				'created_at' => $created_at,
-			));
+			$bill_sn = 0;
+			if ($has_fee == $trade->amount) {
+				$bill_sn = Bill::createSN(15);
+				DB::table('bill')->insert(array(
+					'bill_sn'    => $bill_sn, 
+					'bill_type'  => Bill::TYPE_TRADE, 
+					'amount'     => $trade->amount,
+					'from_id'    => $trade->from_id, 
+					'to_id'      => $trade->to_id,
+					'created_at' => $created_at,
+				));
+			}
 
-			
-			
 			DB::table('account')
 				->where('id', $from_id)
 				->decrement('freeze_out', $amount);
@@ -201,6 +222,68 @@ class Trade extends Base
 				'created_at' => $created_at,
 			));
 		});
+	}
+
+		//è´¦æˆ·äº¤æ˜“
+	public static function transfer($from_id, $to_id, $amount)
+	{
+		if ($error = Account::disabled($from_id))
+		{
+			return $error;
+		}
+		if ($error = Account::disabled($to_id))
+		{
+			return $error;
+		}
+
+		$account = parent::find($from_id);
+
+		if ($amount <= 0) 
+		{
+			return array(404,array('msg' => 'äº¤æ˜“é‡‘é¢æœ‰è¯¯ï¼');
+		}
+
+		if ($account->balance < $amount) 
+		{
+			return array(404,array('msg' => 'ä½™é¢ä¸è¶³ï¼');
+		}
+
+		DB::transaction(function() use($from_id, $to_id, $amount)
+		{
+			$created_at = new \DateTime;
+
+			$ac = DB::table('account')
+				->where('id', $from_id)
+				->where('balance', '>=', $amount)
+				->decrement('balance', $amount);
+			if ($ac)
+			{
+				//ä»˜æ¬¾
+				DB::table('account_record')->insert(array(
+					'account_id' => $from_id, 
+					'rec_type'   => AccountRecord::TYPE_TRADE, 
+					'amount'     => $amount,
+					'fund_flow'  => AccountRecord::FLOW_OUT, 
+					'created_at' => $created_at,
+				));
+
+				//æ”¶æ¬¾
+				DB::table('account')
+					->where('id', $to_id)
+					->increment('balance', $amount);
+				DB::table('account_record')->insert(array(
+					'account_id' => $to_id, 
+					'rec_type'   => AccountRecord::TYPE_TRADE, 
+					'amount'     => $amount,
+					'fund_flow'  => AccountRecord::FLOW_IN, 
+					'created_at' => $created_at,
+				));
+			}
+
+			return $ac;
+		});
+
+		return array(200,array('msg'=>'äº¤æ˜“æˆåŠŸï¼'));
 	}
 
 	/**

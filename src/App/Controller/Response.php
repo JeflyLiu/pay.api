@@ -13,7 +13,7 @@ class Response
     public static function accessor($prefix, $resource, $method = null, $params = null)
     {
         $default = 'index';
-        $method = ($method === null && $default) ? $default : $method;
+        $method  = ($method == null && $default) ? $default : $method;
         $_method = ($prefix == null) ? $method : $prefix . ucfirst($method);
 
         $class = self::load($resource);

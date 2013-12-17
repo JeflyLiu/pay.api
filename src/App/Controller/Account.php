@@ -83,17 +83,24 @@ class Account extends Base {
 	function getByMemberId(){
 		$params = array_merge($_POST, $_GET);
 		$params_config = array(
-				'member_id'=>array('int','required')
+				'member_id'=>array('int','required'),
+				'create_if_not_exist'=>array('int','optional')
 		);
 		$result = $this->validateParams($params_config, $params);
 		if($result['result']>0){
 			Response::render(200,$result);
 		}
-		
+		$account_model = new \App\Service\Account();
 		
 		$member_id = $params['member_id'];
-		$account_model = new \App\Service\Account();
-		$result = $account_model->getByMemberId($member_id);
+		if(isset($_GET['create_if_not_exist']) && $_GET['create_if_not_exist'] == 1){
+			$result = $account_model->getByMemberId($member_id, true);
+		}
+		else{
+			$result = $account_model->getByMemberId($member_id);
+		}
+		
+		
 		unset($result['pwd']);
 		Response::render(200,$result);
 	}

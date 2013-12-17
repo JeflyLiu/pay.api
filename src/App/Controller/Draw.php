@@ -42,8 +42,9 @@ class Draw extends Base {
 		$pay_user = $params["pay_user"];
 		$pay_voucher = $params["pay_voucher"];
 		$pay_type = $params["pay_type"];
+		$pay_amount = $params["pay_amount"];
 		var_dump($params);
-		$result = \App\Service\Draw::finishApply($apply_id, $pay_voucher, $pay_user, $pay_type);
+		$result = \App\Service\Draw::finishApply($apply_id, $pay_voucher, $pay_user, $pay_type, $pay_amount);
 		Response::render(200,$result);
 	}
 	

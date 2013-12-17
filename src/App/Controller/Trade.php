@@ -13,7 +13,7 @@ class Trade extends Base
 	public function getIndex()
 	{
 		$params = $this->app->request->params();
-		$list = TradeModel::getList($params);
+		$list = TradeModel::searchList($params);
 
 		return Response::render(200,$list);
 	}
@@ -24,22 +24,27 @@ class Trade extends Base
 		$to_id = (int) ($this->app->request->params('to_id'));
 		$amount = $this->app->request->params('amount');
 
-		$data = TradeModel::getCreate($from_id, $to_id, $amount);
+		$data = TradeModel::create($from_id, $to_id, $amount);
 
 		return Response::render($data[0], $data[1]);
 	}
 
-	/**
-	* @param $inpour_id
-	* @param $amount
-	* @return mixed
-	*/
-	public function getStore()
+	public function getTransfer()
+	{
+		$data = TradeModel::account(
+			$this->app->request->params('from_id'),
+			$this->app->request->params('to_id'),
+			$this->app->request->params('amount')
+		);
+
+		return Response::render($data[0], $data[1]);
+	}
+
+	public function postStore()
 	{
 		$data = TradeModel::store(
-			$this->app->request->params('trade_sn'), 
-			$this->app->request->params('amount'),
-			$this->app->request->params('use_wallet')
+			$this->app->request->params('trade_sn'),
+			$this->app->request->params('trade_sn')
 		);
 
 		return Response::render($data[0], $data[1]);

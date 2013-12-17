@@ -127,13 +127,19 @@ class Account
 	 * create_time
 	 * last_update
 	 */
-	static function getByMemberId($member_id){
+	static function getByMemberId($member_id, $create_if_not_exist = false){
 		$result = DB::table("account","default")->where("member_id","=", $member_id)->first();
 		if(!empty($result)){
 			$result['is_pwd_locked'] = self::isPwdLocked($result['id'],$result['last_pwd_rest_time']);
 		}
 		else{
-			$result = array();
+			if($create_if_not_exist){
+				self::create($member_id);
+				$result = DB::table("account","default")->where("member_id","=", $member_id)->first();
+			}
+			else{
+				$result = array();
+			}
 		}
 		//unset($result['ac_pwd']);
 		return $result;

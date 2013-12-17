@@ -19,3 +19,10 @@ function getIp()
 	$app = new \Slim\Slim();
 	return $app->request->getIp();
 }
+
+function fault($key)
+{
+	$errors = require_once __DIR__ .'/errors.php';
+	$result = isset($errors[$key]) ? $errors[$key] : null ;
+	return $result;
+}

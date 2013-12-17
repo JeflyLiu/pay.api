@@ -86,8 +86,8 @@ class Account extends Base
 		{
 			$created_at = new \DateTime;
 			$ac = DB::table('account')
-				->where('id',$from_id)
-				->increment('freeze_in',$amount);
+					->where('id',$from_id)
+					->increment('freeze_in',$amount);
 			
 			if ($ac)
 			{
