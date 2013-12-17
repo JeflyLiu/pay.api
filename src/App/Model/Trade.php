@@ -100,7 +100,9 @@ class Trade extends Base
 
 		$account = Account::find($trade->from_id);
 		//账户支付金额
-		$has_fee = $use_wallet ? (($account->balance >= $trade->amount) ? $trade->amount : ($trade->amount - $account->balance)) : 0 ;
+		$has_fee = $use_wallet 
+				? (($account->balance >= $trade->amount) ? $trade->amount : ($trade->amount - $account->balance)) 
+				: 0 ;
 		//外部支付金额
 		$not_fee = $trade->amount - $wallet_fee;
 
@@ -110,13 +112,13 @@ class Trade extends Base
 			{
 				$created_at = new \DateTime;
 				$bill_sn = Bill::createSN(15);
-				$ac = DB::table('account')
+				$rs = DB::table('account')
 					->where('id', $trade->from_id)
 					->where('balance', '>=', $trade->amount)
 					->decrement('balance', $trade->amount);
-				if ($ac)
+				if ($rs)
 				{
-					DB::table('account')->where('id', $trade->from_id)->increment('balance', $trade->amount);
+					DB::table('account')->where('id', $trade->from_id)->increment('freeze_out', $trade->amount);
 					DB::table('account_record')->insert(array(
 						'account_id' => $trade->from_id,
 						'amount'     => $trade->amount,
@@ -126,9 +128,9 @@ class Trade extends Base
 					));
 
 					DB::table('trade')->where('id', $trade->id)->update(array(
-						'status'   => Trade::STATUS_PAY,
-						'total_fee'   => $trade->amount,
-						'bill_pay' => $bill_sn
+						'status'    => Trade::STATUS_PAY,
+						'total_fee' => $trade->amount,
+						'bill_pay'  => $bill_sn
 					));
 
 					DB::table('bill')->insert(array(
@@ -140,91 +142,88 @@ class Trade extends Base
 						'created_at' => $created_at,
 					));
 				}
-				return $ac;
+				return $rs;
 			});
-		}else{
+		}
+		else
+		{
 			$result = DB::transaction(function() use($trade, $has_fee, $not_fee)
 			{
 				$created_at = new \DateTime;
 				$bill_sn = Bill::createSN(15);
-				$ac = DB::table('account')
+				$rs = DB::table('account')
 					->where('id', $trade->from_id)
 					->where('balance', '>=', $has_fee)
-					->decrement('balance', $trade->amount);
-				if ($ac)
+					->decrement('balance', $has_fee);
+				if ($rs)
 				{
-					DB::table('account')->where('id', $trade->from_id)->increment('balance', $has_fee);
+					DB::table('account')->where('id', $trade->from_id)->increment('freeze_out', $has_fee);
 					DB::table('account_record')->insert(array(
 						'account_id' => $trade->from_id,
-						'amount'     => $trade->amount,
-						'rec_type'   => AccountRecord::TYPE_TRADE_FREEZE, 
+						'amount'     => $has_fee,
+						'rec_type'   => AccountRecord::TYPE_FREEZE, 
 						'fund_flow'  => AccountRecord::FLOW_OUT, 
 						'created_at' => $created_at,
 					));
 
 					DB::table('trade')->where('id', $trade->id)->update(array(
-						'status'   => Trade::STATUS_PAY,
-						'total_fee'   => $trade->amount,
-						'bill_pay' => $bill_sn
-					));
-
-					DB::table('bill')->insert(array(
-						'bill_sn'    => $bill_sn, 
-						'bill_type'  => Bill::TYPE_TRADE, 
-						'amount'     => $trade->amount,
-						'from_id'    => $trade->from_id, 
-						'to_id'      => $trade->to_id,
-						'created_at' => $created_at,
+						'status'  => Trade::STATUS_PART,
+						'has_fee' => $has_fee,
+						'not_fee' => $not_fee,
 					));
 				}
-				return $ac;
+				return $rs;
 			});
 		}
 
-		DB::transaction(function() use($trade, $has_fee, $not_fee)
-		{
-			$created_at = new \DateTime;
-
-			$bill_sn = 0;
-			if ($has_fee == $trade->amount) {
-				$bill_sn = Bill::createSN(15);
-				DB::table('bill')->insert(array(
-					'bill_sn'    => $bill_sn, 
-					'bill_type'  => Bill::TYPE_TRADE, 
-					'amount'     => $trade->amount,
-					'from_id'    => $trade->from_id, 
-					'to_id'      => $trade->to_id,
-					'created_at' => $created_at,
-				));
-			}
-
-			DB::table('account')
-				->where('id', $from_id)
-				->decrement('freeze_out', $amount);
-
-			DB::table('account_record')->insert(array(
-				'account_id' => $from_id, 
-				'rec_type'   => AccountRecord::TYPE_TRADE, 
-				'amount'     => $amount,
-				'fund_flow'  => AccountRecord::FLOW_OUT, 
-				'created_at' => $created_at,
-			));
-
-			DB::table('account')
-				->where('id', $to_id)
-				->increment('balance', $to);
-
-			DB::table('account_record')->insert(array(
-				'account_id' => $from_id, 
-				'rec_type'   => AccountRecord::TYPE_TRADE, 
-				'amount'     => $amount,
-				'fund_flow'  => AccountRecord::FLOW_IN, 
-				'created_at' => $created_at,
-			));
-		});
+		return  $result ? Trade::getTradeByTradeSN($trade_sn)->toArray() : array(500,array('msg'=>'交易失败！'));
 	}
 
-		//账户交易
+	public static function inpour($trade_sn, $amount)
+	{
+		$trade = Trade::getTradeByTradeSN($trade_sn);
+
+		if (! $trade)
+		{
+			return array(404, array('msg'=>'交易单不存在！'));
+		}
+		if($trade->not_fee != $amount)
+		{
+			$log = new ErrorLog(array(
+				'obj_id' => $inpour_id, 
+				'e_type' => ErrorLog::TYPE_TRADE_INPOUR,
+				'ip' => getIp(),
+				'code' => 'T001',//交易充值金额有误
+				'note' => "金额: {$amount} ",
+			));
+			$log->save();
+
+			return array(412, array('msg'=>'支付金额有误！'));
+		}
+
+		$result = DB::transaction(function() use($trade, $amount)
+		{
+			$rs = DB::table('account')->where('id', $trade->from_id)->increment('freeze_out', $amount);
+			if ($rs)
+			{
+				DB::table('account_record')->insert(array(
+					'account_id' => $trade->from_id,
+					'amount'     => $amount,
+					'rec_type'   => AccountRecord::TYPE_TRADE_INPOUR, 
+					'fund_flow'  => AccountRecord::FLOW_IN, 
+					'created_at' => $created_at,
+				));
+				DB::table('trade')
+				->where('id', $trade->id)
+				->update(array('status'=>Trade::STATUS_PAY,'total_fee'=>$trade->amount));
+			}
+			return $rs;
+		});
+
+		return $result;
+	}
+
+	//账户交易
 	public static function transfer($from_id, $to_id, $amount)
 	{
 		if ($error = Account::disabled($from_id))
