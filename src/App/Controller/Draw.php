@@ -28,8 +28,7 @@ class Draw extends Base {
 		if($result['result']>0){
 			Response::render(200,$result);
 		}
-		$apply_id = \App\Service\Draw::apply($params, $params["pay_password"]);
-		$result['draw_id'] = $apply_id;
+		$result = \App\Service\Draw::apply($params, $params["pay_password"]);
 		Response::render(200,$result);
 	}
 	

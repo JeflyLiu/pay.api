@@ -179,7 +179,7 @@ class Account
 							'created_at'=>new \DateTime(),
 							'e_type'=>0,
 							'ip'=>'');
-					DB::table('account_error','pay')->insert($log_data);
+					DB::table('account_error')->insert($log_data);
 					//DB::insert('account_error', $log_data);
 				}
 			}
